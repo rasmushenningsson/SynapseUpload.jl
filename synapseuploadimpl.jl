@@ -42,7 +42,7 @@ function describefolder(fi::FolderInfo)
 end
 
 
-function listfiles(path, parentFolderID)
+function listfiles(path)
 	splitPath = split(path, ['/','\\'])
 	while isempty(splitPath[end])
 		pop!(splitPath)
@@ -109,11 +109,24 @@ function nbrbytes2string(x::Integer)
 	@sprintf("%.1f TB", y)
 end
 
+function fullsynapsepath(syn::Synapse, id::AbstractString)
+	try
+		entity = get(syn,id)
+		name = entity["name"]
+
+		typeof(entity) <: Folder || return name # i.e. go upwards until we find the parent project
+		return string(fullsynapsepath(syn,entity["parentId"]), '/', name)
+	end
+	return "[UNKNOWN]"
+end
+
 
 function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo)
+	synapsePath = fullsynapsepath(syn, parentFolderID);
+
 	child = getchildbyname(syn, parentFolderID, fi.name)
 	if !isempty(child)
-		askforconfirmation("Folder \"$(fi.name)\" already exists, continue?") || return false
+		askforconfirmation("Folder \"$(fi.name)\" already exists in \"$synapsePath\", continue?") || return false
 	end
 
 	nbrFolders, totalSize, desc = describefolder(fi)
@@ -126,16 +139,16 @@ function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderI
 	end
 	println("Total size: ", nbrbytes2string(totalSize))
 
-	askforconfirmation("Continue?")
+	askforconfirmation("Upload to \"$synapsePath\"?")
 end
 
 
-function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo)
+function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, executed::AbstractString)
 	folder = getchildbyname(syn, parentID, fi.name)
 	if isempty(folder)
 		# create folder
 		folder = Folder(fi.name, parent=parentID)
-		folder = store(syn,folder)
+		folder = isempty(executed) ? store(syn,folder) : store(syn,folder,executed=executed)
 	end
 
 	annot = getannotations(syn, folder)
@@ -144,12 +157,12 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo)
 
 	for filename in fi.files
 		# TODO: set contentType?
-		file = File( path=joinpath(fi.path,filename), name=filename, parent=folder)
-		store(syn,file)
+		file = File(path=joinpath(fi.path,filename), name=filename, parent=folder)
+		file = isempty(executed) ? store(syn,file) : store(syn,file,executed=executed)
 	end
 
 	for subfolder in fi.folders	
-		_uploadfolder(syn,folder,subfolder)
+		_uploadfolder(syn,folder,subfolder,executed)
 	end
 
 	annot = getannotations(syn, folder)
@@ -157,11 +170,11 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo)
 	setannotations(syn, folder, annot)
 end
 
-_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo) = _uploadfolder(syn, parent["id"], fi)
+_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, executed::AbstractString) = _uploadfolder(syn, parent["id"], fi, executed)
 
 
-function uploadfolder(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo)
-	_uploadfolder(syn,parentFolderID,fi)
+function uploadfolder(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo; executed="")
+	_uploadfolder(syn,parentFolderID,fi,executed)
 end
 
 

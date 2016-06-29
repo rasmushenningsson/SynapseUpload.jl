@@ -35,9 +35,6 @@ using SynapseUpload
 sources = length(ARGS)>0 ? ARGS : ["."]
 map!(abspath,sources)
 
-println(sources)
-
-
 # TODO: error checking
 syn = SynapseClient.login()
 
@@ -57,7 +54,6 @@ end
 
 # upload each folder
 for fi in folders
-	uploadfolder(syn, parentFolderID, fi)
+	uploadfolder(syn, parentFolderID, fi, executed="https://github.com/rasmushenningsson/SynapseUpload.jl/blob/master/synapseupload.jl")
 end
-
 
