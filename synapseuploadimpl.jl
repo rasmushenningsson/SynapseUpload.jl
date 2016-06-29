@@ -7,7 +7,7 @@ export FolderInfo,
 
 
 using SynapseClient
-import SynapseClient: AbstractEntity, Project, Folder, File
+import SynapseClient: AbstractEntity, Project, Folder, File, Activity
 
 
 type FolderInfo
@@ -143,12 +143,14 @@ function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderI
 end
 
 
-function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, executed::AbstractString)
+function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, exec::AbstractString)
 	folder = getchildbyname(syn, parentID, fi.name)
 	if isempty(folder)
 		# create folder
 		folder = Folder(fi.name, parent=parentID)
-		folder = isempty(executed) ? store(syn,folder) : store(syn,folder,executed=executed)
+		act = Activity(name="Uploaded folder")
+		isempty(exec) || executed(act,exec)
+		folder = store(syn,folder,activity=act)
 	end
 
 	annot = getannotations(syn, folder)
@@ -158,11 +160,13 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 	for filename in fi.files
 		# TODO: set contentType?
 		file = File(path=joinpath(fi.path,filename), name=filename, parent=folder)
-		file = isempty(executed) ? store(syn,file) : store(syn,file,executed=executed)
+		act = Activity(name="Uploaded file")
+		isempty(exec) || executed(act,exec)
+		file = store(syn,file,activity=act)
 	end
 
 	for subfolder in fi.folders	
-		_uploadfolder(syn,folder,subfolder,executed)
+		_uploadfolder(syn,folder,subfolder,exec)
 	end
 
 	annot = getannotations(syn, folder)
@@ -170,7 +174,7 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 	setannotations(syn, folder, annot)
 end
 
-_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, executed::AbstractString) = _uploadfolder(syn, parent["id"], fi, executed)
+_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, exec::AbstractString) = _uploadfolder(syn, parent["id"], fi, exec)
 
 
 function uploadfolder(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo; executed="")
