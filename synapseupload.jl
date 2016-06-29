@@ -1,6 +1,13 @@
-if length(ARGS)==1 && lowercase(ARGS[1]) in ["--help", "-help", "-h"]
+function printusage()
 	println("Usage:")
-	println("\tjulia synapseupload.jl [folder1 folder2 ...]")
+	println("\tjulia synapseupload.jl [options] folder1 [folder2 ...]")
+	println("Options:")
+	println("\t-h, --help, -help\tShow help message")
+end
+
+if length(ARGS)==0 || any(x->lowercase(x)∈["--help","-help","-h"],ARGS)
+	printusage()
+	length(ARGS)==0 && println("Error: At least one folder must be specified.")
 	exit(0)
 end
 
@@ -31,7 +38,7 @@ using SynapseUploadUtils
 # 	8. Add annotation that upload finished.
 
 
-sources = length(ARGS)>0 ? ARGS : ["."]
+sources = copy(ARGS)
 map!(abspath,sources)
 
 # TODO: error checking
