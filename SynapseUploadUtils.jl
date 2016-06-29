@@ -1,4 +1,4 @@
-module SynapseUpload
+module SynapseUploadUtils
 
 export FolderInfo,
        listfiles,

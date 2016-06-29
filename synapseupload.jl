@@ -5,8 +5,8 @@ if length(ARGS)==1 && lowercase(ARGS[1]) in ["--help", "-help", "-h"]
 end
 
 using SynapseClient
-include("synapseuploadimpl.jl")
-using SynapseUpload
+include("synapseuploadutils.jl")
+using SynapseUploadUtils
 
 # Implementation
 # 	1. Identify all folders and files recursively.
