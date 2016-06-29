@@ -5,7 +5,6 @@ if length(ARGS)==1 && lowercase(ARGS[1]) in ["--help", "-help", "-h"]
 end
 
 using SynapseClient
-include("synapseuploadutils.jl")
 using SynapseUploadUtils
 
 # Implementation
