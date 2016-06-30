@@ -42,7 +42,7 @@ function describefolder(fi::FolderInfo)
 end
 
 
-function listfiles(path)
+function listfiles(path::AbstractString)
 	splitPath = split(path, ['/','\\'])
 	while isempty(splitPath[end])
 		pop!(splitPath)
@@ -69,6 +69,7 @@ function listfiles(path)
 
 	folderInfo
 end
+
 
 
 function getchildbyname(syn, parentID::AbstractString, child::AbstractString)
@@ -180,6 +181,62 @@ _uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, exec::AbstractString
 function uploadfolder(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo; executed="")
 	_uploadfolder(syn,parentFolderID,fi,executed)
 end
+
+
+
+
+# Upload folder
+# 	1. Identify all folders and files recursively.
+# 		Ignore hidden files/folders.
+# 		Ignore files/folders starting with ".".
+# 	2. Ask for confirmation to continue if folder already exists in Synapse.
+# 	3. Show summary of what will be uploaded:
+# 		Name of folder to be uploaded.
+# 		Nbr of folders.
+# 		Nbr of files with different file endings.
+# 		Total size.
+# 	4. Ask for confirmation to continue.
+# 	5. Create the folder specified in "Your Project/Your Folder".
+# 	6. Add annotation that upload is in progress
+# 	7. Upload files.
+# 		Create subfolders as needed. (Thus, if the upload stops, we will see how far it got.)
+# 	8. Add annotation that upload finished.
+function printuploadusage()
+	println("Usage:")
+	println("\tjulia synapseupload.jl [options] folder1 [folder2 ...]")
+	println("Options:")
+	println("\t-h, --help, -help\tShow help message")
+end
+function uploadfolder(ARGS)
+	if length(ARGS)==0 || any(x->lowercase(x)∈["--help","-help","-h"],ARGS)
+		printuploadusage()
+		length(ARGS)==0 && println("Error: At least one folder must be specified.")
+		return
+	end
+
+	sources = copy(ARGS)
+	map!(abspath,sources)
+
+	syn = SynapseClient.login()
+
+	parentFolderID = "syn6177609"
+
+	# prepare 
+	folders = Array{FolderInfo,1}(length(sources))
+	map!(listfiles, folders, sources)
+
+	# check that it is ok to upload each folder
+	for fi in folders
+		confirmupload(syn, parentFolderID, fi) || exit(0) # error("User abort")
+	end
+
+	# upload each folder
+	for fi in folders
+		uploadfolder(syn, parentFolderID, fi, executed="https://github.com/rasmushenningsson/SynapseUpload.jl/blob/master/synapseupload.jl")
+	end
+end
+
+
 
 
 end
