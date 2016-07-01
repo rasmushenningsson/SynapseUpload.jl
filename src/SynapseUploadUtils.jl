@@ -3,11 +3,13 @@ module SynapseUploadUtils
 export FolderInfo,
        listfiles,
        confirmupload,
-       uploadfolder
+       uploadfolder,
+       copyfolder
 
 
 using SynapseClient
 import SynapseClient: AbstractEntity, Project, Folder, File, Activity
+
 
 
 type FolderInfo
@@ -112,7 +114,7 @@ end
 
 function fullsynapsepath(syn::Synapse, id::AbstractString)
 	try
-		entity = get(syn,id)
+		entity = get(syn, id, downloadFile=false)
 		name = entity["name"]
 
 		typeof(entity) <: Folder || return name # i.e. go upwards until we find the parent project
@@ -123,7 +125,7 @@ end
 
 
 function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo)
-	synapsePath = fullsynapsepath(syn, parentFolderID);
+	synapsePath = fullsynapsepath(syn, parentFolderID)
 
 	child = getchildbyname(syn, parentFolderID, fi.name)
 	if !isempty(child)
@@ -235,6 +237,143 @@ function uploadfolder(ARGS)
 		uploadfolder(syn, parentFolderID, fi, executed="https://github.com/rasmushenningsson/SynapseUpload.jl/blob/master/synapseupload.jl")
 	end
 end
+
+
+
+
+
+type FileCopyInfo
+	sourceID::AbstractString
+	name::AbstractString
+	# some folder info is needed for flatten=false
+end
+
+
+
+function listsynapsefiles!(syn::Synapse, list::Array{FileCopyInfo,1}, parentID::AbstractString; recursive=true)
+	results = chunkedquery(syn, "select id from entity where entity.parentId=='$parentID'")
+	for r in results
+		id = r["entity.id"]
+		entity = get(syn, id, downloadFile=false)
+
+		if typeof(entity) == File
+			push!(list, FileCopyInfo(id, entity["name"]))
+		elseif typeof(entity) == Folder && recursive
+			listsynapsefiles!(syn, list, id, recursive=recursive)
+		end	
+	end
+	list
+end
+
+function listsynapsefiles(syn::Synapse,parentID::AbstractString; recursive=true)
+	list = Array{FileCopyInfo,1}()
+	listsynapsefiles!(syn, list, parentID, recursive=recursive)
+end
+
+
+function matchany{T<:AbstractString}(names::Array{T}, patterns::Array{Regex,1})
+	Bool[any(pattern->match(pattern,name)!=nothing, patterns) for name in names]
+end
+
+function performcopy(syn::Synapse, list::Array{FileCopyInfo,1}, destinationID::AbstractString, exec::AbstractString)
+	profile = getuserprofile(syn)
+
+	for f in list
+		file = get(syn, f.sourceID, downloadFile=false)
+		@assert typeof(file)==File
+
+		act = Activity(name="Copied file", used=file)
+		isempty(exec) || executed(act,exec)
+
+
+		local newFile
+
+		if profile["ownerId"] == file["createdBy"] # no need to copy if the file has the same creator
+	        newFile = File(name=file["name"], parentId=destinationID)
+	        newFile["dataFileHandleId"] = file["dataFileHandleId"]
+		else # fallback to copy
+            file = get(syn,f.sourceID,downloadFile=true) # download file
+            newFile = File(path=file["path"], name=file["name"], parentId=destinationID)
+		end
+		store(syn,newFile,activity=act)
+	end
+end
+
+
+function copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, destinationParentID::AbstractString, patterns::Array{Regex,1}; flatten=true, askForConfirmation=true, localScript="", externalScript="")
+	flatten == true || error("Only flatten=true supported at the moment.")
+	!isempty(localScript) && !isempty(externalScript) && error("Only one of localScript and externalScript can be specified.")
+
+	if askForConfirmation && isempty(localScript) && isempty(externalScript)
+		askforconfirmation("Please consider specifying localScript or externalScript, continue anyway?") || return false
+	end
+
+	synapsePath = fullsynapsepath(syn, destinationParentID)
+	localScriptName = "copy_$(folderName).jl" # only used if localScript is set
+
+	if askForConfirmation
+		destinationID = getchildbyname(syn, destinationParentID, folderName)
+		if !isempty(destinationID)
+			askforconfirmation("Folder \"$(folderName)\" already exists in \"$synapsePath\", continue?") || return false
+		end
+	end
+
+
+
+
+	sourceFolderID = getchildbyname(syn,parentID,folderName)
+	sourceFolder = get(syn,sourceFolderID,downloadFile=false)
+	@assert typeof(sourceFolder)==Folder "Source should be a folder."
+
+
+	list = listsynapsefiles(syn, sourceFolderID, recursive=true)
+	mask = matchany(map(x->x.name,list), patterns)
+	list = list[mask] # only keep files with names matching at least one of the patterns
+
+	if askForConfirmation
+		println("--- Summary for $folderName ---")
+		for f in list
+			println("\t$(f.name)")
+		end
+		isempty(localScript) || (fn = splitdir(localScript)[2]; println("Local script \"$fn\" will be uploaded to \"$synapsePath/$localScriptName\"."))
+		isempty(externalScript) || println("External script: \"$externalScript\" is used for provenance.")
+		askforconfirmation("Copy files to \"$synapsePath\"?") || return false
+	end
+
+	if flatten
+		names = map(x->x.name,list)
+		length(names) != length(unique(names)) && error("Could not flatten file structure due to name collisions.")
+	end
+
+	# create destination folder
+	destFolder = Folder(name=folderName,parentId=destinationParentID)
+	destFolder = store(syn, destFolder)
+
+
+	# setup executed
+	executed = ""
+	if !isempty(localScript)
+		# upload script and set executed as synapse id
+		scriptFile = File(path=localScript, name=localScriptName, parentId=destinationParentID)
+		scriptFile = store(syn, scriptFile)
+		executed = scriptFile["id"]
+	elseif !isempty(externalScript) # just refer to external script
+		executed = externalScript
+	end
+	
+
+
+	performcopy(syn,list,destFolder["id"], executed) # copy files
+	true
+end
+
+copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, destinationParentID::AbstractString, pattern::Regex; kwargs...) = 
+	copyfolder(syn, folderName, parentID, destinationParentID, [pattern]; kwargs...)
+copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, destinationParentID::AbstractString, patterns::Array{AbstractString,1}; kwargs...) = 
+	copyfolder(syn, folderName, parentID, destinationParentID, map(Regex,pattern); kwargs...)
+copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, destinationParentID::AbstractString, pattern::AbstractString; kwargs...) = 
+	copyfolder(syn, folderName, parentID, destinationParentID, Regex(pattern); kwargs...)
+
 
 
 
