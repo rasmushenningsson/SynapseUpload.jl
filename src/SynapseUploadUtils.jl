@@ -91,6 +91,27 @@ end
 getchildbyname(syn, parent::AbstractEntity, child::AbstractString) = getchildbyname(syn, parent["id"],child)
 
 
+function retrystore(syn::Synapse, args...; kwargs...)
+	const delays = Int[5, 30, 60]
+	i = 0 # how many times did we fail?
+	while true
+		try
+			return store(syn, args...; kwargs...)
+		catch ex
+			i += 1
+			if i>length(delays)
+				println("Synapse store failed. Aborting.")
+				rethrow(ex)
+			end
+
+			println("Synapse store failed. Waiting $(delays[i])s before trying again.")
+			sleep(delays[i])
+		end
+	end
+end
+
+
+
 function askforconfirmation(str::AbstractString)
 	while true
 		println(str, " (y/n)")
@@ -153,7 +174,7 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 		folder = Folder(fi.name, parent=parentID)
 		act = Activity(name="Uploaded folder")
 		isempty(exec) || executed(act,exec)
-		folder = store(syn,folder,activity=act)
+		folder = retrystore(syn,folder,activity=act)
 	end
 
 	annot = getannotations(syn, folder)
@@ -165,7 +186,7 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 		file = File(path=joinpath(fi.path,filename), name=filename, parent=folder)
 		act = Activity(name="Uploaded file")
 		isempty(exec) || executed(act,exec)
-		file = store(syn,file,activity=act)
+		file = retrystore(syn,file,activity=act)
 	end
 
 	for subfolder in fi.folders	
@@ -295,7 +316,7 @@ function performcopy(syn::Synapse, list::Array{FileCopyInfo,1}, destinationID::A
             file = get(syn,f.sourceID,downloadFile=true) # download file
             newFile = File(path=file["path"], name=file["name"], parentId=destinationID)
 		end
-		store(syn,newFile,activity=act)
+		retrystore(syn,newFile,activity=act)
 	end
 end
 
@@ -347,7 +368,7 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 
 	# create destination folder
 	destFolder = Folder(name=folderName,parentId=destinationParentID)
-	destFolder = store(syn, destFolder)
+	destFolder = retrystore(syn, destFolder)
 
 
 	# setup executed
@@ -356,7 +377,7 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 		# upload script and set executed as synapse id
 		scriptFile = File(path=localScript, name=localScriptName, parentId=destinationParentID)
 		scriptFile["fileNameOverride"] = localScriptName # standardize the script file name (i.e. use same name as for uploaded folder)
-		scriptFile = store(syn, scriptFile)
+		scriptFile = retrystore(syn, scriptFile)
 		executed = scriptFile["id"]
 	elseif !isempty(externalScript) # just refer to external script
 		executed = externalScript
