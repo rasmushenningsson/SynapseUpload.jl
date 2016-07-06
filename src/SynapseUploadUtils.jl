@@ -145,11 +145,11 @@ function fullsynapsepath(syn::Synapse, id::AbstractString)
 end
 
 
-function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo)
+function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo; askForConfirmation=true)
 	synapsePath = fullsynapsepath(syn, parentFolderID)
 
 	child = getchildbyname(syn, parentFolderID, fi.name)
-	if !isempty(child)
+	if askForConfirmation && !isempty(child)
 		askforconfirmation("Folder \"$(fi.name)\" already exists in \"$synapsePath\", continue?") || return false
 	end
 
@@ -163,7 +163,10 @@ function confirmupload(syn::Synapse, parentFolderID::AbstractString, fi::FolderI
 	end
 	println("Total size: ", nbrbytes2string(totalSize))
 
-	askforconfirmation("Upload to \"$synapsePath\"?")
+	if askForConfirmation
+		askforconfirmation("Upload to \"$synapsePath\"?") || return false
+	end
+	true
 end
 
 
@@ -229,13 +232,23 @@ function printuploadusage()
 	println("\tjulia synapseupload.jl [options] folder1 [folder2 ...]")
 	println("Options:")
 	println("\t-h, --help, -help\tShow help message")
+	println("\t-y\t\t\tUpload without asking for confirmation")
 end
 function uploadfolder(ARGS)
-	if length(ARGS)==0 || any(x->lowercase(x)∈["--help","-help","-h"],ARGS)
-		printuploadusage()
-		length(ARGS)==0 && println("Error: At least one folder must be specified.")
-		return
+	showHelp = length(ARGS)==0 || any(x->lowercase(x)∈["--help","-help","-h"],ARGS)
+	showHelp &&	printuploadusage()
+
+	askForConfirmation = true
+
+	# TODO: improve command line argument handling
+	if ARGS[1]=="-y"
+		ARGS = ARGS[2:end]
+		askForConfirmation = false
 	end
+
+	length(ARGS)==0 && println("Error: At least one folder must be specified.")
+	(showHelp || length(ARGS)==0) && return
+
 
 	sources = copy(ARGS)
 	map!(abspath,sources)
@@ -250,7 +263,7 @@ function uploadfolder(ARGS)
 
 	# check that it is ok to upload each folder
 	for fi in folders
-		confirmupload(syn, parentFolderID, fi) || exit(0) # error("User abort")
+		confirmupload(syn, parentFolderID, fi, askForConfirmation=askForConfirmation) || exit(0) # error("User abort")
 	end
 
 	# upload each folder
