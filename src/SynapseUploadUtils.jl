@@ -10,6 +10,7 @@ export FolderInfo,
 using SynapseClient
 import SynapseClient: AbstractEntity, Project, Folder, File, Activity
 
+using ArgParse
 
 
 type FolderInfo
@@ -44,7 +45,7 @@ function describefolder(fi::FolderInfo)
 end
 
 
-function listfiles(path::AbstractString)
+function listfiles(path::AbstractString; excludeFiles=[], excludeFolders=[])
 	splitPath = split(path, ['/','\\'])
 	while isempty(splitPath[end])
 		pop!(splitPath)
@@ -61,9 +62,11 @@ function listfiles(path::AbstractString)
 
 		fullFilePath = joinpath(path, file)
 		if isdir(fullFilePath)
+			any(r->match(r,file)!=nothing, excludeFolders) && continue
 			# println("folder: $file")
-			push!(folderInfo.folders, listfiles(fullFilePath))
+			push!(folderInfo.folders, listfiles(fullFilePath, excludeFiles=excludeFiles, excludeFolders=excludeFolders))
 		else
+			any(r->match(r,file)!=nothing, excludeFiles) && continue
 			# println("file: $file")
 			push!(folderInfo.files, file)
 		end
@@ -227,39 +230,55 @@ end
 # 	7. Upload files.
 # 		Create subfolders as needed. (Thus, if the upload stops, we will see how far it got.)
 # 	8. Add annotation that upload finished.
-function printuploadusage()
-	println("Usage:")
-	println("\tjulia synapseupload.jl [options] folder1 [folder2 ...]")
-	println("Options:")
-	println("\t-h, --help, -help\tShow help message")
-	println("\t-y\t\t\tUpload without asking for confirmation")
+
+function parse_uploadfolder_commandline(ARGS)
+    s = ArgParseSettings()
+
+    @add_arg_table s begin
+        "--yes", "-y"
+            help = "Upload without asking for confirmation"
+            action = :store_true
+        "--parent", "-p"
+        	help = "Parent folder (synapse ID)"
+            arg_type = UTF8String
+        	default = UTF8String("syn6177609")
+        "--excludefile", "-e"
+            help = "Exclude files matching pattern"
+            arg_type = Regex
+            action = :append_arg 
+        "--excludefolder", "-x"
+            help = "Exclude folders matching pattern"
+            arg_type = Regex
+            action = :append_arg 
+        "folders"
+            help = "Folders to upload"
+            nargs = '*'
+            arg_type = UTF8String
+            #action = :append_arg 
+            required = true
+    end
+
+    return parse_args(ARGS, s)
 end
+
 function uploadfolder(ARGS)
-	showHelp = length(ARGS)==0 || any(x->lowercase(x)∈["--help","-help","-h"],ARGS)
-	showHelp &&	printuploadusage()
+	parsedArgs = parse_uploadfolder_commandline(ARGS)
+	askForConfirmation = !parsedArgs["yes"]
+	sources = parsedArgs["folders"]
 
-	askForConfirmation = true
+	excludeFiles = parsedArgs["excludefile"]
+	excludeFolders = parsedArgs["excludefolder"]
 
-	# TODO: improve command line argument handling
-	if ARGS[1]=="-y"
-		ARGS = ARGS[2:end]
-		askForConfirmation = false
-	end
-
-	length(ARGS)==0 && println("Error: At least one folder must be specified.")
-	(showHelp || length(ARGS)==0) && return
+	parentFolderID = parsedArgs["parent"]
 
 
-	sources = copy(ARGS)
 	map!(abspath,sources)
 
 	syn = SynapseClient.login()
 
-	parentFolderID = "syn6177609"
-
 	# prepare 
 	folders = Array{FolderInfo,1}(length(sources))
-	map!(listfiles, folders, sources)
+	map!( s->listfiles(s,excludeFiles=excludeFiles,excludeFolders=excludeFolders), folders, sources)
 
 	# check that it is ok to upload each folder
 	for fi in folders
