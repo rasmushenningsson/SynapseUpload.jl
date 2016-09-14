@@ -353,7 +353,10 @@ function performcopy(syn::Synapse, list::Array{FileCopyInfo,1}, destinationID::A
 end
 
 
-function copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, destinationParentID::AbstractString, patterns::Array{Regex,1}; flatten=true, askForConfirmation=true, localScript="", externalScript="")
+function copyfolder(syn::Synapse, folderName::AbstractString, parentID::AbstractString, 
+	                destinationParentID::AbstractString, patterns::Array{Regex,1}; 
+	                destinationName::AbstractString="", flatten=true, askForConfirmation=true, 
+	                localScript="", externalScript="")
 	flatten == true || error("Only flatten=true supported at the moment.")
 	!isempty(localScript) && !isempty(externalScript) && error("Only one of localScript and externalScript can be specified.")
 
@@ -361,13 +364,16 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 		askforconfirmation("Please consider specifying localScript or externalScript, continue anyway?") || return false
 	end
 
+	destinationName = isempty(destinationName) ? folderName : destinationName
+
+
 	synapsePath = fullsynapsepath(syn, destinationParentID)
-	localScriptName = "copy_$(folderName).jl" # only used if localScript is set
+	localScriptName = "copy_$(destinationName).jl" # only used if localScript is set
 
 	if askForConfirmation
-		destinationID = getchildbyname(syn, destinationParentID, folderName)
+		destinationID = getchildbyname(syn, destinationParentID, destinationName)
 		if !isempty(destinationID)
-			askforconfirmation("Folder \"$(folderName)\" already exists in \"$synapsePath\", continue?") || return false
+			askforconfirmation("Folder \"$(destinationName)\" already exists in \"$synapsePath\", continue?") || return false
 		end
 	end
 
@@ -384,7 +390,7 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 	list = list[mask] # only keep files with names matching at least one of the patterns
 
 	if askForConfirmation
-		println("--- Summary for $folderName ---")
+		println("--- Summary for $destinationName ---")
 		for f in list
 			println("\t$(f.name)")
 		end
@@ -399,7 +405,7 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 	end
 
 	# create destination folder
-	destFolder = Folder(name=folderName,parentId=destinationParentID)
+	destFolder = Folder(name=destinationName,parentId=destinationParentID)
 	destFolder = retrystore(syn, destFolder)
 
 
