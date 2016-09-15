@@ -62,11 +62,11 @@ function listfiles(path::AbstractString; excludeFiles=[], excludeFolders=[])
 
 		fullFilePath = joinpath(path, file)
 		if isdir(fullFilePath)
-			any(r->match(r,file)!=nothing, excludeFolders) && continue
+			any(r->ismatch(r,file), excludeFolders) && continue
 			# println("folder: $file")
 			push!(folderInfo.folders, listfiles(fullFilePath, excludeFiles=excludeFiles, excludeFolders=excludeFolders))
 		else
-			any(r->match(r,file)!=nothing, excludeFiles) && continue
+			any(r->ismatch(r,file), excludeFiles) && continue
 			# println("file: $file")
 			push!(folderInfo.files, file)
 		end
