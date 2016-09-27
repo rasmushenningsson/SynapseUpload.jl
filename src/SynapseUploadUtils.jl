@@ -387,10 +387,17 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 
 	list = listsynapsefiles(syn, sourceFolderID, recursive=true)
 	mask = matchany(map(x->x.name,list), patterns)
+	skipped = list[~mask]
 	list = list[mask] # only keep files with names matching at least one of the patterns
 
 	if askForConfirmation
 		println("--- Summary for $destinationName ---")
+		println("-Skipped-")
+		for f in skipped
+			println("\t$(f.name)")
+		end
+
+		println("-Uploading-")
 		for f in list
 			println("\t$(f.name)")
 		end
