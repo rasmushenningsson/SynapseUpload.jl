@@ -420,8 +420,12 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 	executed = ""
 	if !isempty(localScript)
 		# upload script and set executed as synapse id
+		
 		scriptFile = File(path=localScript, name=localScriptName, parentId=destinationParentID)
-		scriptFile["fileNameOverride"] = localScriptName # standardize the script file name (i.e. use same name as for uploaded folder)
+
+		# Had to remove this line since "FileNameOverride" is deprecated. It doesn't break anything, but if the script is downloaded, it will use the old filename which is annoying.
+		#scriptFile["fileNameOverride"] = localScriptName # standardize the script file name (i.e. use same name as for uploaded folder)
+
 		scriptFile = retrystore(syn, scriptFile)
 		executed = scriptFile["id"]
 	elseif !isempty(externalScript) # just refer to external script
