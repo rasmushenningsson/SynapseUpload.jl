@@ -67,6 +67,7 @@ function listfiles(path::AbstractString; excludeFiles=[], excludeFolders=[])
 			push!(folderInfo.folders, listfiles(fullFilePath, excludeFiles=excludeFiles, excludeFolders=excludeFolders))
 		else
 			any(r->ismatch(r,file), excludeFiles) && continue
+			filesize(fullFilePath)==0 && continue # Synapse doesn't allow uploading of empty files
 			# println("file: $file")
 			push!(folderInfo.files, file)
 		end
