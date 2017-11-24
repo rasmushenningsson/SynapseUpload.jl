@@ -5,6 +5,7 @@ Simple uploading script for adding raw data to Synapse.
 - (install python)
 - pip install synapseclient
 - Pkg.add("PyCall")
+- Pkg.add("ArgParse")
 - Pkg.clone("https://github.com/rasmushenningsson/SynapseClient.jl.git")
 - Pkg.clone("https://github.com/rasmushenningsson/SynapseUploadUtils.jl.git")
 - put link to synapseupload in path
