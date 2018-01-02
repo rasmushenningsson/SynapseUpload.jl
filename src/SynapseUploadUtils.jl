@@ -90,7 +90,7 @@ function getchildbyname(syn, parentID::AbstractString, child::AbstractString)
 		i>1 && error("Unexpected error, multiple children with the same name.")
 		res = r["entity.id"]
 	end
-	res::ASCIIString
+	res::String
 end
 getchildbyname(syn, parent::AbstractEntity, child::AbstractString) = getchildbyname(syn, parent["id"],child)
 
