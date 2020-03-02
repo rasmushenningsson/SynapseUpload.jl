@@ -403,7 +403,7 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 
 	list = listsynapsefiles(syn, sourceFolderID, recursive=true)
 	mask = matchany(map(x->x.name,list), patterns)
-	skipped = list[~mask]
+	skipped = list[.!mask]
 	list = list[mask] # only keep files with names matching at least one of the patterns
 
 	if askForConfirmation
@@ -443,14 +443,14 @@ function copyfolder(syn::Synapse, folderName::AbstractString, parentID::Abstract
 		#scriptFile["fileNameOverride"] = localScriptName # standardize the script file name (i.e. use same name as for uploaded folder)
 
 		scriptFile = retrystore(syn, scriptFile)
-		executed = scriptFile["id"]
+		executed = scriptFile.id
 	elseif !isempty(externalScript) # just refer to external script
 		executed = externalScript
 	end
 	
 
 
-	performcopy(syn,list,destFolder["id"], executed) # copy files
+	performcopy(syn,list,destFolder.id, executed) # copy files
 	true
 end
 
