@@ -313,7 +313,7 @@ function listsynapsefiles!(syn::Synapse, list::Vector{FileCopyInfo}, parentID::A
 		entity = get(syn, id, downloadFile=false)
 
 		if typeof(entity) == File
-			push!(list, FileCopyInfo(id, entity["name"]))
+			push!(list, FileCopyInfo(id, entity.name))
 		elseif typeof(entity) == Folder && recursive
 			listsynapsefiles!(syn, list, id, recursive=recursive)
 		end
@@ -357,12 +357,12 @@ function performcopy(syn::Synapse, list::Array{FileCopyInfo,1}, destinationID::A
 
 		local newFile
 
-		if profile["ownerId"] == file["createdBy"] # no need to copy if the file has the same creator
-	        newFile = File(name=file["name"], parentId=destinationID)
-	        newFile["dataFileHandleId"] = file["dataFileHandleId"]
+		if profile["ownerId"] == file.createdBy # no need to copy if the file has the same creator
+	        newFile = File(name=file.name, parentId=destinationID)
+	        newFile.dataFileHandleId = file.dataFileHandleId
 		else # fallback to copy
             file = get(syn,f.sourceID,downloadFile=true) # download file
-            newFile = File(path=file["path"], name=file["name"], parentId=destinationID)
+            newFile = File(path=file.path, name=file.name, parentId=destinationID)
 		end
 		retrystore(syn,newFile,activity=act)
 	end
