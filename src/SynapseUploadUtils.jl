@@ -307,19 +307,31 @@ end
 
 
 
-function listsynapsefiles!(syn::Synapse, list::Array{FileCopyInfo,1}, parentID::AbstractString; recursive=true)
-	results = chunkedquery(syn, "select id from entity where entity.parentId=='$parentID'")
-	for r in results
-		id = r["entity.id"]
+function listsynapsefiles!(syn::Synapse, list::Vector{FileCopyInfo}, parentID::AbstractString; recursive=true)
+    for c in getchildren(syn, parentID)
+		id = c["id"]
 		entity = get(syn, id, downloadFile=false)
 
 		if typeof(entity) == File
 			push!(list, FileCopyInfo(id, entity["name"]))
 		elseif typeof(entity) == Folder && recursive
 			listsynapsefiles!(syn, list, id, recursive=recursive)
-		end	
-	end
-	list
+		end
+    end
+    list
+
+	# results = chunkedquery(syn, "select id from entity where entity.parentId=='$parentID'")
+	# for r in results
+	# 	id = r["entity.id"]
+	# 	entity = get(syn, id, downloadFile=false)
+
+	# 	if typeof(entity) == File
+	# 		push!(list, FileCopyInfo(id, entity["name"]))
+	# 	elseif typeof(entity) == Folder && recursive
+	# 		listsynapsefiles!(syn, list, id, recursive=recursive)
+	# 	end
+	# end
+	# list
 end
 
 function listsynapsefiles(syn::Synapse,parentID::AbstractString; recursive=true)
