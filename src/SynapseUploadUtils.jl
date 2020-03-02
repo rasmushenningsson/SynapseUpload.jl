@@ -142,10 +142,10 @@ end
 function fullsynapsepath(syn::Synapse, id::AbstractString)
 	try
 		entity = get(syn, id, downloadFile=false)
-		name = entity["name"]
+		name = entity.name
 
 		typeof(entity) <: Folder || return name # i.e. go upwards until we find the parent project
-		return string(fullsynapsepath(syn,entity["parentId"]), '/', name)
+		return string(fullsynapsepath(syn,entity.parentId), '/', name)
 	catch
 	end
 	return "[UNKNOWN]"
@@ -188,7 +188,7 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 	end
 
 	annot = getannotations(syn, folder)
-	annot["uploading"] = "In progress"
+	annot.uploading = "In progress"
 	setannotations(syn, folder, annot)
 
 	for filename in fi.files
@@ -204,11 +204,11 @@ function _uploadfolder(syn::Synapse, parentID::AbstractString, fi::FolderInfo, e
 	end
 
 	annot = getannotations(syn, folder)
-	annot["uploading"] = "Finished"
+	annot.uploading = "Finished"
 	setannotations(syn, folder, annot)
 end
 
-_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, exec::AbstractString) = _uploadfolder(syn, parent["id"], fi, exec)
+_uploadfolder(syn::Synapse, parent::Folder, fi::FolderInfo, exec::AbstractString) = _uploadfolder(syn, parent.id, fi, exec)
 
 
 function uploadfolder(syn::Synapse, parentFolderID::AbstractString, fi::FolderInfo; executed="")
@@ -357,7 +357,7 @@ function performcopy(syn::Synapse, list::Array{FileCopyInfo,1}, destinationID::A
 
 		local newFile
 
-		if profile["ownerId"] == file.createdBy # no need to copy if the file has the same creator
+		if profile.ownerId == file.createdBy # no need to copy if the file has the same creator
 	        newFile = File(name=file.name, parentId=destinationID)
 	        newFile.dataFileHandleId = file.dataFileHandleId
 		else # fallback to copy
