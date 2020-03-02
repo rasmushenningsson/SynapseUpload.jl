@@ -11,9 +11,10 @@ using SynapseClient
 import SynapseClient: AbstractEntity, Project, Folder, File, Activity
 
 using ArgParse
+using Printf
 
 
-type FolderInfo
+struct FolderInfo
 	path
 	name
 	files::Array{AbstractString,1}
@@ -96,7 +97,7 @@ getchildbyname(syn, parent::AbstractEntity, child::AbstractString) = getchildbyn
 
 
 function retrystore(syn::Synapse, args...; kwargs...)
-	const delays = Int[5, 30, 60]
+	delays = Int[5, 30, 60]
 	i = 0 # how many times did we fail?
 	while true
 		try
@@ -144,6 +145,7 @@ function fullsynapsepath(syn::Synapse, id::AbstractString)
 
 		typeof(entity) <: Folder || return name # i.e. go upwards until we find the parent project
 		return string(fullsynapsepath(syn,entity["parentId"]), '/', name)
+	catch
 	end
 	return "[UNKNOWN]"
 end
@@ -235,7 +237,7 @@ end
 function parse_uploadfolder_commandline(ARGS)
     s = ArgParseSettings()
 
-    @add_arg_table s begin
+    @add_arg_table! s begin
         "--yes", "-y"
             help = "Upload without asking for confirmation"
             action = :store_true
@@ -296,7 +298,7 @@ end
 
 
 
-type FileCopyInfo
+struct FileCopyInfo
 	sourceID::AbstractString
 	name::AbstractString
 	# some folder info is needed for flatten=false
@@ -325,7 +327,7 @@ function listsynapsefiles(syn::Synapse,parentID::AbstractString; recursive=true)
 end
 
 
-function matchany{T<:AbstractString}(names::Array{T}, patterns::Array{Regex,1})
+function matchany(names::Array{T}, patterns::Array{Regex,1}) where {T<:AbstractString}
 	Bool[any(pattern->match(pattern,name)!=nothing, patterns) for name in names]
 end
 
