@@ -79,21 +79,22 @@ end
 
 
 
-function getchildbyname(syn, parentID::AbstractString, child::AbstractString)
-	results = chunkedquery(syn, "select id from entity where entity.parentId=='$parentID' and entity.name=='$child'")
+function getchildbyname(syn, parentID::AbstractString, child::AbstractString)::String
+    # if 0 results, return "",
+    # if 1 result, return it
+    # if 2 results, error
 
-	# # if 0 results, return "",
-	# # if 1 result, return it
-	# # if 2 results, error
-
-	res = ""
-	for (i,r) in enumerate(results)
-		i>1 && error("Unexpected error, multiple children with the same name.")
-		res = r["entity.id"]
-	end
-	res::String
+    res = ""
+    for c in getchildren(syn, parentID)
+        if get(c,"name",nothing) == child
+            @assert isempty(res) "Unexpected error, multiple children with the same name."
+            res = c["id"]
+        end
+    end
+    res
 end
-getchildbyname(syn, parent::AbstractEntity, child::AbstractString) = getchildbyname(syn, parent["id"],child)
+getchildbyname(syn, parent::AbstractEntity, child::AbstractString) = getchildbyname(syn, parent.id,child)
+getchildbyname(syn, parent, args::AbstractString...) = getchildbyname(syn,getchildbyname(syn, parent, args[1]),args[2:end]...)
 
 
 function retrystore(syn::Synapse, args...; kwargs...)
